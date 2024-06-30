@@ -124,7 +124,7 @@ document.addEventListener("click", async (e) => {
           partial ? partial : nextUrl.href,
           location.href,
         );
-        await fetchPartials(partialUrl);
+        await fetchPartials(nextUrl, partialUrl);
         updateLinks(nextUrl);
         scrollTo({ left: 0, top: 0, behavior: "instant" });
       } finally {
@@ -157,7 +157,7 @@ document.addEventListener("click", async (e) => {
           partial,
           location.href,
         );
-        await fetchPartials(partialUrl);
+        await fetchPartials(partialUrl, partialUrl);
       }
     }
   }
@@ -192,7 +192,7 @@ addEventListener("popstate", async (e) => {
 
   const url = new URL(location.href, location.origin);
   try {
-    await fetchPartials(url);
+    await fetchPartials(url, url);
     updateLinks(url);
     scrollTo({
       left: state.scrollX ?? 0,
@@ -234,14 +234,16 @@ document.addEventListener("submit", async (e) => {
       return;
     }
 
-    const action = e.submitter?.getAttribute(PARTIAL_ATTR) ??
+    const rawPartialUrl = e.submitter?.getAttribute(PARTIAL_ATTR) ??
       e.submitter?.getAttribute("formaction") ??
       el.getAttribute(PARTIAL_ATTR) ?? el.action;
+    const rawActionUrl = e.submitter?.getAttribute("formaction") ?? el.action;
 
-    if (action !== "") {
+    if (rawPartialUrl !== "") {
       e.preventDefault();
 
-      const url = new URL(action, location.href);
+      const partialUrl = new URL(rawPartialUrl, location.href);
+      const actionUrl = new URL(rawActionUrl, location.href);
 
       let init: RequestInit | undefined;
 
@@ -249,14 +251,13 @@ document.addEventListener("submit", async (e) => {
       if (lowerMethod === "get") {
         // TODO: Looks like constructor type for URLSearchParam is wrong
         // deno-lint-ignore no-explicit-any
-        const qs = new URLSearchParams(new FormData(el) as any);
-        qs.forEach((value, key) => url.searchParams.set(key, value));
+        const qs = new URLSearchParams(new FormData(el, e.submitter) as any);
+        qs.forEach((value, key) => partialUrl.searchParams.set(key, value));
       } else {
-        init = { body: new FormData(el), method: lowerMethod };
+        init = { body: new FormData(el, e.submitter), method: lowerMethod };
       }
 
-      maybeUpdateHistory(url);
-      await fetchPartials(url, init);
+      await fetchPartials(actionUrl, partialUrl, init);
     }
   }
 });
@@ -281,10 +282,24 @@ function updateLinks(url: URL) {
   });
 }
 
-async function fetchPartials(url: URL, init: RequestInit = {}) {
+async function fetchPartials(
+  actualUrl: URL,
+  partialUrl: URL,
+  init: RequestInit = {},
+) {
   init.redirect = "follow";
-  url.searchParams.set(PARTIAL_SEARCH_PARAM, "true");
-  const res = await fetch(url, init);
+  partialUrl = new URL(partialUrl);
+  partialUrl.searchParams.set(PARTIAL_SEARCH_PARAM, "true");
+  const res = await fetch(partialUrl, init);
+
+  if (res.redirected) {
+    const nextUrl = new URL(res.url);
+    if (nextUrl.origin === actualUrl.origin) {
+      actualUrl = nextUrl;
+    }
+  }
+
+  maybeUpdateHistory(actualUrl);
   await applyPartials(res);
 }
 
@@ -466,6 +481,7 @@ function revivePartials(
 
         const instance = ACTIVE_PARTIALS.get(partialName);
         if (instance === undefined) {
+          // deno-lint-ignore no-console
           console.warn(`Partial "${partialName}" not found. Skipping...`);
           // Partial doesn't exist on the current page
         } else {

@@ -1,5 +1,5 @@
-import { App, staticFiles } from "@fresh/core";
-import { Partial } from "@fresh/core/runtime";
+import { App, staticFiles } from "fresh";
+import { Partial } from "fresh/runtime";
 import {
   allIslandApp,
   assertMetaContent,
@@ -74,8 +74,6 @@ Deno.test({
       await waitForText(page, ".output", "partial update");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -117,8 +115,6 @@ Deno.test({
       assertNotSelector(doc, ".init");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -159,8 +155,6 @@ Deno.test({
       );
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -199,8 +193,6 @@ Deno.test({
 
     // TODO: Check error overlay
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 // See https://github.com/denoland/fresh/issues/2254
@@ -233,7 +225,7 @@ Deno.test({
 
     await withBrowserApp(app, async (page, address) => {
       let didError = false;
-      page.addEventListener("pageerror", (ev) => {
+      page.addEventListener("pageerror", () => {
         didError = true;
       });
 
@@ -244,8 +236,6 @@ Deno.test({
       expect(didError).toEqual(false);
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -284,8 +274,6 @@ Deno.test({
       await page.locator(".ready").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -319,8 +307,6 @@ Deno.test({
 
     // TODO: Test error overlay
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -361,8 +347,6 @@ Deno.test({
       });
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -407,8 +391,6 @@ Deno.test({
       expect(counter).toEqual("1");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -455,8 +437,6 @@ Deno.test({
       assertNotSelector(doc, ".output");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -496,8 +476,6 @@ Deno.test({
       await page.locator(".inner-update").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -549,8 +527,6 @@ Deno.test({
       await page.locator(".sib-3-update").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -610,8 +586,6 @@ Deno.test({
       await waitForText(page, "#c .output", "3");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -684,8 +658,6 @@ Deno.test({
       await waitForText(page, "#c .output", "3");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -758,8 +730,6 @@ Deno.test({
       await waitForText(page, "#c .output", "3");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -825,8 +795,6 @@ Deno.test({
       await waitForText(page, "#c .output", "3");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -850,8 +818,6 @@ Deno.test({
 
     expect(html).not.toMatch(/frsh:key:outside/);
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -896,8 +862,6 @@ Deno.test({
       assertNotSelector(doc, ".done-0");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -946,8 +910,6 @@ Deno.test({
       assertNotSelector(doc, ".done-0");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -994,8 +956,6 @@ Deno.test({
       expect(doc.querySelector(".content")!.textContent).toEqual("init01");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1045,8 +1005,6 @@ Deno.test({
       expect(doc.querySelector(".content")!.textContent).toEqual("init01");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1092,8 +1050,6 @@ Deno.test({
       expect(doc.querySelector(".content")!.textContent).toEqual("10init");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1143,8 +1099,6 @@ Deno.test({
       expect(doc.querySelector(".content")!.textContent).toEqual("10init");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1201,8 +1155,6 @@ Deno.test({
       });
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1258,8 +1210,6 @@ Deno.test({
       });
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1325,8 +1275,6 @@ Deno.test({
       });
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1392,8 +1340,6 @@ Deno.test({
       });
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1450,8 +1396,6 @@ Deno.test({
       expect(scroll.scrollY > 100).toEqual(true);
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1459,10 +1403,12 @@ Deno.test({
   fn: async () => {
     const app = testApp()
       .get("/partial", (ctx) => {
+        const name = ctx.url.searchParams.get("name")!;
+        const submitter = ctx.url.searchParams.get("submitter")!;
         return ctx.render(
           <Doc>
             <Partial name="foo">
-              <p class={"done-" + ctx.url.searchParams.get("name")!}>done</p>
+              <p class={`done-${name}-${submitter}`}>done</p>
             </Partial>
           </Doc>,
         );
@@ -1477,7 +1423,7 @@ Deno.test({
                   <p class="init">init</p>
                 </Partial>
                 <SelfCounter />
-                <button class="update">
+                <button class="update" name="submitter" value="sub">
                   update
                 </button>
               </form>
@@ -1494,11 +1440,9 @@ Deno.test({
       await waitForText(page, ".output", "1");
 
       await page.locator(".update").click();
-      await page.locator(".done-foo").wait();
+      await page.locator(".done-foo-sub").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1506,10 +1450,12 @@ Deno.test({
   fn: async () => {
     const app = testApp()
       .get("/partial", (ctx) => {
+        const name = ctx.url.searchParams.get("name")!;
+        const submitter = ctx.url.searchParams.get("submitter")!;
         return ctx.render(
           <Doc>
             <Partial name="foo">
-              <p class={"done-" + ctx.url.searchParams.get("name")!}>done</p>
+              <p class={`done-${name}-${submitter}`}>done</p>
             </Partial>
           </Doc>,
         );
@@ -1524,7 +1470,7 @@ Deno.test({
                   <p class="init">init</p>
                 </Partial>
                 <SelfCounter />
-                <button class="update">
+                <button class="update" name="submitter" value="sub">
                   update
                 </button>
               </form>
@@ -1541,11 +1487,12 @@ Deno.test({
       await waitForText(page, ".output", "1");
 
       await page.locator(".update").click();
-      await page.locator(".done-foo").wait();
+      await page.locator(".done-foo-sub").wait();
+
+      const pathname = await page.evaluate(() => window.location.pathname);
+      expect(pathname).toEqual("/foo");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1555,13 +1502,68 @@ Deno.test({
       .post("/partial", async (ctx) => {
         const data = await ctx.req.formData();
         const name = data.get("name");
+        const submitter = data.get("submitter");
         return ctx.render(
           <Doc>
             <Partial name="foo">
-              <p class={"done-" + name}>done</p>
+              <p class={`done-${name}-${submitter}`}>done</p>
             </Partial>
           </Doc>,
         );
+      })
+      .get("/", (ctx) => {
+        return ctx.render(
+          <Doc>
+            <div f-client-nav>
+              <form action="/partial" method="post">
+                <input name="name" value="foo" />
+                <Partial name="foo">
+                  <p class="init">init</p>
+                </Partial>
+                <SelfCounter />
+                <button class="update" name="submitter" value="sub">
+                  update
+                </button>
+              </form>
+            </div>
+          </Doc>,
+        );
+      });
+
+    await withBrowserApp(app, async (page, address) => {
+      await page.goto(address, { waitUntil: "load" });
+      await page.locator(".ready").wait();
+
+      await page.locator(".increment").click();
+      await waitForText(page, ".output", "1");
+
+      await page.locator(".update").click();
+      await page.locator(".done-foo-sub").wait();
+    });
+  },
+});
+
+Deno.test({
+  name: "partials - submit form redirecct",
+  fn: async () => {
+    const app = testApp()
+      .get("/done", (ctx) => {
+        return ctx.render(
+          <Doc>
+            <Partial name="foo">
+              <h1 class="done">success</h1>
+            </Partial>
+          </Doc>,
+        );
+      })
+      .post("/partial", async (ctx) => {
+        const data = await ctx.req.formData();
+        const name = String(data.get("name"));
+
+        return new Response(null, {
+          status: 303,
+          headers: { Location: `/done?name=${encodeURIComponent(name)}` },
+        });
       })
       .get("/", (ctx) => {
         return ctx.render(
@@ -1586,15 +1588,13 @@ Deno.test({
       await page.goto(address, { waitUntil: "load" });
       await page.locator(".ready").wait();
 
-      await page.locator(".increment").click();
-      await waitForText(page, ".output", "1");
-
       await page.locator(".update").click();
-      await page.locator(".done-foo").wait();
+      await page.locator(".done").wait();
+
+      const pathname = await page.evaluate(() => window.location.pathname);
+      expect(pathname).toEqual("/done");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1604,10 +1604,11 @@ Deno.test({
       .post("/partial", async (ctx) => {
         const data = await ctx.req.formData();
         const name = data.get("name");
+        const submitter = data.get("submitter");
         return ctx.render(
           <Doc>
             <Partial name="foo">
-              <p class={"done-" + name}>done</p>
+              <p class={`done-${name}-${submitter}`}>done</p>
             </Partial>
           </Doc>,
         );
@@ -1632,6 +1633,8 @@ Deno.test({
                 form="foo"
                 formaction="/partial"
                 formmethod="POST"
+                name="submitter"
+                value="sub"
               >
                 submit
               </button>
@@ -1648,11 +1651,9 @@ Deno.test({
       await waitForText(page, ".output", "1");
 
       await page.locator(".update").click();
-      await page.locator(".done-foo").wait();
+      await page.locator(".done-foo-sub").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1662,10 +1663,11 @@ Deno.test({
       .post("/partial", async (ctx) => {
         const data = await ctx.req.formData();
         const name = data.get("name");
+        const submitter = data.get("submitter");
         return ctx.render(
           <Doc>
             <Partial name="foo">
-              <p class={"done-" + name}>done</p>
+              <p class={`done-${name}-${submitter}`}>done</p>
             </Partial>
           </Doc>,
         );
@@ -1691,6 +1693,8 @@ Deno.test({
                 formaction="/foo"
                 formmethod="POST"
                 f-partial="/partial"
+                name="submitter"
+                value="sub"
               >
                 submit
               </button>
@@ -1707,11 +1711,9 @@ Deno.test({
       await waitForText(page, ".output", "1");
 
       await page.locator(".update").click();
-      await page.locator(".done-foo").wait();
+      await page.locator(".done-foo-sub").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1722,10 +1724,11 @@ Deno.test({
       .post("/partial", async (ctx) => {
         const data = await ctx.req.formData();
         const name = data.get("name");
+        const submitter = data.get("submitter");
         return ctx.render(
           <Doc>
             <Partial name="foo">
-              <p class={"done-" + name}>done</p>
+              <p class={`done-${name}-${submitter}`}>done</p>
             </Partial>
           </Doc>,
         );
@@ -1752,6 +1755,8 @@ Deno.test({
                 formaction="/partial"
                 formmethod="POST"
                 f-partial="/partial"
+                name="submitter"
+                value="sub"
               >
                 submit
               </button>
@@ -1771,14 +1776,12 @@ Deno.test({
         page.waitForNavigation(),
         page.locator(".update").click(),
       ]);
-      await page.locator(".done-foo").wait();
+      await page.locator(".done-foo-sub").wait();
 
       const doc = parseHtml(await page.content());
       assertNotSelector(doc, "button");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1807,8 +1810,6 @@ Deno.test({
       expect(logs).toEqual([]);
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1844,8 +1845,6 @@ Deno.test({
       expect(scroll > 0).toEqual(true);
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1891,8 +1890,6 @@ Deno.test({
       expect(logs[0]).toMatch(/Found no partials/);
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -1989,8 +1986,6 @@ Deno.test({
       expect(textColor).toEqual("rgb(0, 128, 0)");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -2078,8 +2073,6 @@ Deno.test({
       ).toEqual(true);
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -2120,8 +2113,6 @@ Deno.test({
       await page.locator(".status-refreshed").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -2173,8 +2164,6 @@ Deno.test({
       await waitForText(page, "#inner .output", "1");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -2211,8 +2200,6 @@ Deno.test({
       await page.locator(".done").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -2248,8 +2235,6 @@ Deno.test({
       await page.locator(".error-404").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -2288,6 +2273,47 @@ Deno.test({
       expect(title).toEqual("after update");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "partials - backwards navigation should keep URLs",
+  fn: async () => {
+    const app = testApp()
+      .get("/other", (ctx) => {
+        return ctx.render(
+          <Doc>
+            <Partial name="foo">
+              <h1 class="done">other</h1>
+            </Partial>
+            <SelfCounter />
+          </Doc>,
+        );
+      })
+      .get("/", (ctx) => {
+        return ctx.render(
+          <Doc>
+            <div f-client-nav>
+              <a href="/other">other</a>
+              <Partial name="foo">
+                <h1 class="init">foo</h1>
+              </Partial>
+              <SelfCounter />
+            </div>
+          </Doc>,
+        );
+      });
+
+    await withBrowserApp(app, async (page, address) => {
+      await page.goto(address, { waitUntil: "load" });
+      await page.locator(".ready").wait();
+      await page.locator("a").click();
+      await page.locator(".done").wait();
+
+      await page.evaluate(() => window.history.go(-1));
+      await page.locator(".init").wait();
+      const rawUrl = await page.evaluate(() => window.location.href);
+      const url = new URL(rawUrl);
+      expect(`${url.pathname}${url.search}`).toEqual("/");
+    });
+  },
 });

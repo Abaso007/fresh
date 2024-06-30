@@ -1,9 +1,5 @@
 import * as path from "@std/path";
-import { MODE, type Mode } from "./runtime/server/mod.tsx";
-
-export interface FreshPlugin {
-  name: string;
-}
+import type { Mode } from "./runtime/server/mod.ts";
 
 export interface FreshConfig {
   root?: string;
@@ -39,9 +35,11 @@ export interface ResolvedFreshConfig {
   mode: Mode;
 }
 
-export function parseRootPath(root: string): string {
+export function parseRootPath(root: string, cwd: string): string {
   if (root.startsWith("file://")) {
     root = path.fromFileUrl(root);
+  } else if (!path.isAbsolute(root)) {
+    root = path.join(cwd, root);
   }
 
   const ext = path.extname(root);
@@ -56,7 +54,9 @@ export function parseRootPath(root: string): string {
 }
 
 export function normalizeConfig(options: FreshConfig): ResolvedFreshConfig {
-  const root = options.root ? parseRootPath(options.root) : Deno.cwd();
+  const root = options.root
+    ? parseRootPath(options.root, Deno.cwd())
+    : Deno.cwd();
 
   return {
     root,
@@ -65,7 +65,7 @@ export function normalizeConfig(options: FreshConfig): ResolvedFreshConfig {
     },
     basePath: options.basePath ?? "",
     staticDir: options.staticDir ?? path.join(root, "static"),
-    mode: MODE,
+    mode: "production",
   };
 }
 

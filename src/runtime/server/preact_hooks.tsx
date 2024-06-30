@@ -11,7 +11,7 @@ import {
 } from "preact";
 import type { Signal } from "@preact/signals";
 import type { Stringifiers } from "../../jsonify/stringify.ts";
-import type { FreshContext } from "../../context.ts";
+import type { PageProps } from "../../context.ts";
 import { asset, Partial, type PartialProps } from "../shared.ts";
 import { stringify } from "../../jsonify/stringify.ts";
 import type { ServerIslandRegistry } from "../../context.ts";
@@ -26,11 +26,10 @@ import {
 import type { BuildCache } from "../../build_cache.ts";
 import { BUILD_ID } from "../build_id.ts";
 import { DEV_ERROR_OVERLAY_URL } from "../../constants.ts";
-import {
-  getCodeFrame,
-} from "../../dev/middlewares/error_overlay/code_frame.tsx";
 import * as colors from "@std/fmt/colors";
 import { escape as escapeHtml } from "@std/html";
+import { HttpError } from "../../error.ts";
+import { getCodeFrame } from "../../dev/middlewares/error_overlay/code_frame.tsx";
 
 const enum OptionsType {
   ATTR = "attr",
@@ -71,7 +70,6 @@ export class RenderState {
   error: Error | null = null;
   // deno-lint-ignore no-explicit-any
   slots: Array<{ id: number; name: string; vnode: VNode<any> } | null> = [];
-  basePath = ""; // FIXME
   // deno-lint-ignore no-explicit-any
   islandProps: any[] = [];
   islands = new Set<Island>();
@@ -87,7 +85,7 @@ export class RenderState {
   hasRuntimeScript = false;
 
   constructor(
-    public ctx: FreshContext<unknown, unknown>,
+    public ctx: PageProps<unknown, unknown>,
     public islandRegistry: ServerIslandRegistry,
     public buildCache: BuildCache,
     public partialId: string,
@@ -395,14 +393,14 @@ export function FreshScripts() {
     <>
       {slots.map((slot) => {
         if (slot === null) return null;
-        // FIXME: Wait for https://github.com/preactjs/preact/pull/4334 to be
-        // released
-        return h(
-          "template",
-          { key: slot.id, id: `frsh-${slot.id}-${slot.name}` },
-          slot.vnode,
-          // deno-lint-ignore no-explicit-any
-        ) as VNode<any>;
+        return (
+          <template
+            key={slot.id}
+            id={`frsh-${slot.id}-${slot.name}`}
+          >
+            {slot.vnode}
+          </template>
+        );
       })}
       <FreshRuntimeScript />
     </>
@@ -464,7 +462,7 @@ function FreshRuntimeScript() {
       const named = island.exportName === "default"
         ? island.name
         : `{ ${island.exportName} }`;
-      return `import ${named} from "${asset(chunk)}";`;
+      return `import ${named} from "${asset(`${basePath}${chunk}`)}";`;
     }).join("");
 
     const islandObj = "{" + islandArr.map((island) => island.name)
@@ -488,7 +486,7 @@ function FreshRuntimeScript() {
             __html: scriptContent,
           }}
         />
-        <ShowErrorOverlay />
+        {ctx.config.mode === "development" ? <ShowErrorOverlay /> : null}
       </>
     );
   }
@@ -501,6 +499,11 @@ export function ShowErrorOverlay() {
   const error = ctx.error;
 
   if (error === null || error === undefined) return null;
+
+  // Ignore HTTP errors <500
+  if (error instanceof HttpError && error.status < 500) {
+    return null;
+  }
 
   const basePath = ctx.config.basePath;
 

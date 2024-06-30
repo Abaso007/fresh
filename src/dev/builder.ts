@@ -70,6 +70,8 @@ export class Builder implements FreshBuilder {
       .use(devErrorOverlay())
       .mountApp("*", app);
 
+    devApp.config.mode = "development";
+
     setBuildCache(
       devApp,
       new MemoryBuildCache(
@@ -97,6 +99,7 @@ export class Builder implements FreshBuilder {
         this.#options.target,
       ),
     );
+
     return await this.#build(app, false);
   }
 
@@ -117,10 +120,16 @@ export class Builder implements FreshBuilder {
       // Ignore
     }
 
-    const buildCache = getBuildCache(app)! as MemoryBuildCache | DiskBuildCache;
+    const buildCache = getBuildCache(app)! as
+      | MemoryBuildCache
+      | DiskBuildCache;
+
+    const runtimePath = dev
+      ? "../runtime/client/dev.ts"
+      : "../runtime/client/mod.tsx";
 
     const entryPoints: Record<string, string> = {
-      "fresh-runtime": dev ? "@fresh/core/client-dev" : "@fresh/core/client",
+      "fresh-runtime": new URL(runtimePath, import.meta.url).href,
     };
     const seenEntries = new Map<string, Island>();
     const mapIslandToEntry = new Map<Island, string>();
@@ -193,6 +202,7 @@ export class Builder implements FreshBuilder {
     await buildCache.flush();
 
     if (!dev) {
+      // deno-lint-ignore no-console
       console.log(
         `Assets written to: ${colors.cyan(build.outDir)}`,
       );

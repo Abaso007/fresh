@@ -1,5 +1,5 @@
 import { expect } from "@std/expect";
-import { App, setBuildCache } from "./app.ts";
+import { App, getIslandRegistry, setBuildCache } from "./app.ts";
 import { FakeServer } from "./test_utils.ts";
 import { ProdBuildCache } from "./build_cache.ts";
 
@@ -429,7 +429,7 @@ Deno.test.ignore("FreshApp - finish setup", async () => {
       build: {
         outDir: "foo",
       },
-    }),
+    }, getIslandRegistry(app).size),
   );
 
   const server = new FakeServer(await app.handler());
@@ -469,4 +469,20 @@ Deno.test("FreshApp - sets error on context", async () => {
   expect(thrown.length).toEqual(2);
   expect(thrown[0][0]).toEqual(thrown[0][1]);
   expect(thrown[1][0]).toEqual(thrown[1][1]);
+});
+
+Deno.test("FreshApp - support setting request init in ctx.render()", async () => {
+  const app = new App<{ text: string }>()
+    .get("/", (ctx) => {
+      return ctx.render(<div>ok</div>, {
+        status: 416,
+        headers: { "X-Foo": "foo" },
+      });
+    });
+
+  const server = new FakeServer(await app.handler());
+  const res = await server.get("/");
+  await res.body?.cancel();
+  expect(res.status).toEqual(416);
+  expect(res.headers.get("X-Foo")).toEqual("foo");
 });

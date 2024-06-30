@@ -55,3 +55,52 @@ Deno.test("error overlay - should not be visible for HttpError <500", async () =
   expect(content).toContain("fresh-error-overlay");
   expect(res.status).toEqual(500);
 });
+
+Deno.test(
+  "error overlay - should not be visible for HttpError <500 #2",
+  async () => {
+    const app = new App();
+    app.use(devErrorOverlay());
+    app.config.mode = "development";
+    app
+      .use(async (ctx) => {
+        try {
+          return await ctx.next();
+        } catch {
+          return ctx.render(<p>ok</p>);
+        }
+      })
+      .get("/", () => {
+        throw new HttpError(404);
+      });
+
+    const server = new FakeServer(await app.handler());
+    const res = await server.get("/", {
+      headers: {
+        accept: "text/html",
+      },
+    });
+    const content = await res.text();
+    expect(content).not.toContain("fresh-error-overlay");
+  },
+);
+
+Deno.test("error overlay - should not be visible in prod", async () => {
+  const app = new App();
+  app.use(devErrorOverlay());
+  app.config.mode = "production";
+
+  app.get("/", () => {
+    throw new HttpError(500);
+  });
+
+  const server = new FakeServer(await app.handler());
+  const res = await server.get("/", {
+    headers: {
+      accept: "text/html",
+    },
+  });
+  const content = await res.text();
+  expect(content).not.toContain("fresh-error-overlay");
+  expect(res.status).toEqual(500);
+});

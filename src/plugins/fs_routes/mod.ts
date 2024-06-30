@@ -4,7 +4,6 @@ import type { WalkEntry } from "@std/fs/walk";
 import * as path from "@std/path";
 import type { RouteConfig } from "../../types.ts";
 import type { RouteHandler } from "../../handlers.ts";
-import type { FreshContext } from "../../context.ts";
 import type { MiddlewareFn } from "../../middlewares/mod.ts";
 import {
   type AsyncAnyComponent,
@@ -13,9 +12,9 @@ import {
 import { type Method, pathToPattern } from "../../router.ts";
 import { type HandlerFn, isHandlerByMethod } from "../../handlers.ts";
 import { type FsAdapter, fsAdapter } from "../../fs.ts";
-import type { PageProps } from "../../runtime/server/mod.tsx";
 import { HttpError } from "../../error.ts";
 import { parseRootPath } from "../../config.ts";
+import type { FreshReqContext, PageProps } from "../../context.ts";
 
 const TEST_FILE_PATTERN = /[._]test\.(?:[tj]sx?|[mc][tj]s)$/;
 const GROUP_REG = /(^|[/\\\\])\((_[^/\\\\]+)\)[/\\\\]/;
@@ -34,12 +33,8 @@ export interface FreshFsItem<State> {
   handler?: RouteHandler<unknown, State> | HandlerFn<unknown, State>[];
   handlers?: RouteHandler<unknown, State>;
   default?:
-    | AnyComponent<
-      PageProps<unknown, State> & Pick<FreshContext<unknown, State>, "redirect">
-    >
-    | AsyncAnyComponent<
-      PageProps<unknown, State> & Pick<FreshContext<unknown, State>, "redirect">
-    >;
+    | AnyComponent<PageProps<unknown, State>>
+    | AsyncAnyComponent<PageProps<unknown, State>>;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -70,7 +65,9 @@ export async function fsRoutes<State>(
   const ignore = options.ignoreFilePattern ?? [TEST_FILE_PATTERN];
   const fs = options._fs ?? fsAdapter;
 
-  const dir = options.dir ? parseRootPath(options.dir) : app.config.root;
+  const dir = options.dir
+    ? parseRootPath(options.dir, fs.cwd())
+    : app.config.root;
   const islandDir = path.join(dir, "islands");
   const routesDir = path.join(dir, "routes");
 
@@ -160,6 +157,8 @@ export async function fsRoutes<State>(
 
   const stack: InternalRoute<State>[] = [];
   let hasApp = false;
+
+  const specialPaths = new Set<string>();
 
   for (let i = 0; i < routeModules.length; i++) {
     const routeMod = routeModules[i];
@@ -251,10 +250,15 @@ export async function fsRoutes<State>(
         }
         let parent = mod.path.slice(0, -"_error".length);
         parent = parent === "/" ? "*" : parent + "*";
-        app.all(
-          parent,
-          errorMiddleware(errorComponents, handler),
-        );
+
+        // Add error route as its own route
+        if (!specialPaths.has(mod.path)) {
+          specialPaths.add(mod.path);
+          app.all(
+            parent,
+            errorMiddleware(errorComponents, handler),
+          );
+        }
         middlewares.push(errorMiddleware(errorComponents, handler));
         continue;
       }
@@ -280,13 +284,19 @@ export async function fsRoutes<State>(
       }
     }
 
-    if (routeMod.component !== null) {
-      components.push(routeMod.component);
-    }
-
     const handlers = routeMod.handlers;
     const routePath = routeMod.config?.routeOverride ??
       pathToPattern(normalized.slice(1));
+
+    if (routeMod.component !== null) {
+      components.push(routeMod.component);
+      const missingGetHandler = handlers !== null &&
+        isHandlerByMethod(handlers) &&
+        !Object.keys(handlers).includes("GET");
+      if (missingGetHandler) {
+        app.get(routePath, renderMiddleware(components, undefined));
+      }
+    }
 
     if (
       handlers === null ||
@@ -324,7 +334,7 @@ function errorMiddleware<State>(
     try {
       return await ctx.next();
     } catch (err) {
-      ctx.error = err;
+      (ctx as FreshReqContext<State>).error = err;
       return mid(ctx);
     }
   };

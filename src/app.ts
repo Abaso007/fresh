@@ -39,11 +39,6 @@ export type ListenOptions = Partial<Deno.ServeTlsOptions> & {
   remoteAddress?: string;
 };
 
-export interface RouteCacheEntry<T> {
-  params: Record<string, string>;
-  handler: MiddlewareFn<T>;
-}
-
 export let getRouter: <State>(app: App<State>) => Router<MiddlewareFn<State>>;
 // deno-lint-ignore no-explicit-any
 export let getIslandRegistry: (app: App<any>) => ServerIslandRegistry;
@@ -138,8 +133,8 @@ export class App<State> {
     const middlewares = app.#router._middlewares;
 
     // Special case when user calls one of these:
-    // - `app.mounApp("/", otherApp)`
-    // - `app.mounApp("*", otherApp)`
+    // - `app.mountApp("/", otherApp)`
+    // - `app.mountApp("*", otherApp)`
     const isSelf = path === "*" || path === "/";
     if (isSelf && middlewares.length > 0) {
       this.#router._middlewares.push(...middlewares);
@@ -176,7 +171,10 @@ export class App<State> {
     (request: Request, info?: Deno.ServeHandlerInfo) => Promise<Response>
   > {
     if (this.#buildCache === null) {
-      this.#buildCache = await ProdBuildCache.fromSnapshot(this.config);
+      this.#buildCache = await ProdBuildCache.fromSnapshot(
+        this.config,
+        this.#islandRegistry.size,
+      );
     }
 
     if (
@@ -205,30 +203,30 @@ export class App<State> {
       const { params, handlers } = matched;
       const ctx = new FreshReqContext<State>(
         req,
+        url,
+        conn,
+        params,
         this.config,
         next,
         this.#islandRegistry,
         this.#buildCache!,
-        conn,
       );
-
-      ctx.params = params;
 
       try {
         if (handlers.length === 1 && handlers[0].length === 1) {
           return handlers[0][0](ctx);
         }
-
-        ctx.next = next;
         return await runMiddlewares(handlers, ctx);
       } catch (err) {
         if (err instanceof HttpError) {
           if (err.status >= 500) {
+            // deno-lint-ignore no-console
             console.error(err);
           }
           return new Response(err.message, { status: err.status });
         }
 
+        // deno-lint-ignore no-console
         console.error(err);
         return new Response("Internal server error", { status: 500 });
       }
@@ -249,23 +247,22 @@ export class App<State> {
         );
         const localLabel = colors.bold("Local:");
 
-        // Print more concise output for deploy logs
-        if (DENO_DEPLOYMENT_ID) {
-          console.log(
-            colors.bgRgb8(colors.rgb8(" 🍋 Fresh ready ", 0), 121),
-            `${localLabel} ${address}`,
-          );
-        } else {
+        // Don't spam logs with this on live deployments
+        if (!DENO_DEPLOYMENT_ID) {
+          // deno-lint-ignore no-console
           console.log();
+          // deno-lint-ignore no-console
           console.log(
             colors.bgRgb8(colors.rgb8(" 🍋 Fresh ready   ", 0), 121),
           );
           const sep = options.remoteAddress ? "" : "\n";
           const space = options.remoteAddress ? " " : "";
+          // deno-lint-ignore no-console
           console.log(`    ${localLabel}  ${space}${address}${sep}`);
           if (options.remoteAddress) {
             const remoteLabel = colors.bold("Remote:");
             const remoteAddress = colors.cyan(options.remoteAddress);
+            // deno-lint-ignore no-console
             console.log(`    ${remoteLabel}  ${remoteAddress}\n`);
           }
         }

@@ -1,7 +1,8 @@
 import { type AnyComponent, h, type RenderableProps, type VNode } from "preact";
 import type { MiddlewareFn } from "../../middlewares/mod.ts";
 import type { HandlerFn, PageResponse } from "../../handlers.ts";
-import type { PageProps } from "../../runtime/server/mod.tsx";
+import type { FreshReqContext, PageProps } from "../../context.ts";
+import { HttpError } from "../../error.ts";
 
 export type AsyncAnyComponent<P> = {
   (
@@ -20,6 +21,7 @@ export function renderMiddleware<State>(
     | AsyncAnyComponent<PageProps<unknown, State>>
   >,
   handler: HandlerFn<unknown, State> | undefined,
+  init?: ResponseInit | undefined,
 ): MiddlewareFn<State> {
   return async (ctx) => {
     let result: PageResponse<unknown> | undefined;
@@ -30,18 +32,21 @@ export function renderMiddleware<State>(
         return res;
       }
 
-      // deno-lint-ignore no-explicit-any
-      result = res as any;
+      result = res;
     }
 
     if (components.length === 0) {
       throw new Error(`Did not receive any components to render.`);
     }
 
+    const props = ctx as FreshReqContext<State>;
+    props.data = result?.data;
+
     let vnode: VNode | null = null;
     for (let i = components.length - 1; i >= 0; i--) {
       const child = vnode;
-      const Component = () => child;
+      // FIXME: remove when we're using `<Slot />`
+      props.Component = () => child;
 
       const fn = components[i];
 
@@ -49,26 +54,34 @@ export function renderMiddleware<State>(
         typeof fn === "function" &&
         fn.constructor.name === "AsyncFunction"
       ) {
-        const result = (await fn({ ...ctx, Component })) as VNode | Response;
+        const result = (await fn(props)) as VNode | Response;
         if (result instanceof Response) {
           return result;
         }
         vnode = result;
       } else {
         // deno-lint-ignore no-explicit-any
-        vnode = h(components[i] as any, {
-          config: ctx.config,
-          url: ctx.url,
-          req: ctx.req,
-          params: ctx.params,
-          state: ctx.state,
-          Component,
-          error: ctx.error,
-          data: result?.data ?? {},
-        }) as VNode;
+        vnode = h(components[i] as any, props) as VNode;
       }
     }
 
-    return ctx.render(vnode!);
+    let status: number | undefined = init?.status ?? result?.status;
+    if (
+      ctx.error !== null && ctx.error !== undefined
+    ) {
+      if (
+        ctx.error instanceof HttpError
+      ) {
+        status = ctx.error.status;
+      } else {
+        status = 500;
+      }
+    }
+
+    return ctx.render(vnode!, {
+      status,
+      statusText: init?.statusText,
+      headers: init?.headers ?? result?.headers,
+    });
   };
 }

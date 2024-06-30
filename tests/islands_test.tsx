@@ -1,4 +1,4 @@
-import { App, fsRoutes } from "@fresh/core";
+import { App, fsRoutes } from "fresh";
 import { Counter } from "./fixtures_islands/Counter.tsx";
 import { IslandInIsland } from "./fixtures_islands/IslandInIsland.tsx";
 import { JsonIsland } from "./fixtures_islands/JsonIsland.tsx";
@@ -9,6 +9,7 @@ import { NullIsland } from "./fixtures_islands/NullIsland.tsx";
 import { Multiple1, Multiple2 } from "./fixtures_islands/Multiple.tsx";
 import { JsxIsland } from "./fixtures_islands/JsxIsland.tsx";
 import { JsxChildrenIsland } from "./fixtures_islands/JsxChildrenIsland.tsx";
+import { NodeProcess } from "./fixtures_islands/NodeProcess.tsx";
 import { signal } from "@preact/signals";
 import {
   allIslandApp,
@@ -27,11 +28,14 @@ import { EscapeIsland } from "./fixtures_islands/EscapeIsland.tsx";
 import * as path from "@std/path";
 import { setBuildCache } from "../src/app.ts";
 import { getBuildCache } from "../src/app.ts";
+import type { FreshConfig } from "../src/config.ts";
+import { FreshAttrs } from "./fixtures_islands/FreshAttrs.tsx";
+import { FakeServer } from "../src/test_utils.ts";
 
 await buildProd(allIslandApp);
 
-function testApp() {
-  const app = new App();
+function testApp(config?: FreshConfig) {
+  const app = new App(config);
   setBuildCache(app, getBuildCache(allIslandApp));
   return app;
 }
@@ -60,8 +64,6 @@ Deno.test({
       await waitForText(page, ".output", "4");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -92,8 +94,6 @@ Deno.test({
       await waitForText(page, "#multiple-2 .output", "1");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -123,8 +123,6 @@ Deno.test({
       await waitForText(page, "#counter-2 .output", "1");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -153,8 +151,6 @@ Deno.test({
       expect(json).toEqual({ foo: 123 });
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -178,8 +174,6 @@ Deno.test({
       await page.locator(".ready").wait();
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -210,8 +204,6 @@ Deno.test({
       expect(html).not.toContain("import { Counter }");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -240,8 +232,6 @@ Deno.test({
       expect(doc.querySelector(".children")!.childNodes.length).toEqual(0);
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -272,8 +262,6 @@ Deno.test({
       expect(JSON.parse(text)).toEqual({ jsx: true, children: true });
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -309,8 +297,6 @@ Deno.test({
       expect(childText).toEqual("foobar");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -343,8 +329,6 @@ Deno.test({
       await waitForText(page, ".output", "1");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -388,8 +372,6 @@ Deno.test({
       await waitForText(page, ".children .output", "1");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -433,8 +415,6 @@ Deno.test({
       await waitForText(page, ".children .output", "1");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -509,8 +489,6 @@ Deno.test({
       expect(radio2).toEqual(true);
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -541,8 +519,6 @@ Deno.test({
       expect(text).toEqual("it works");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
 });
 
 Deno.test({
@@ -572,8 +548,89 @@ Deno.test({
       expect(text).toEqual("it works");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "islands - stub Node 'process.env'",
+  fn: async () => {
+    const nodeProcess = getIsland("NodeProcess.tsx");
+
+    const app = testApp()
+      .use(staticFiles())
+      .island(nodeProcess, "NodeProcess", NodeProcess)
+      .get("/", (ctx) =>
+        ctx.render(
+          <Doc>
+            <NodeProcess />
+          </Doc>,
+        ));
+
+    await withBrowserApp(app, async (page, address) => {
+      await page.goto(`${address}/`, { waitUntil: "load" });
+      await page.locator(".ready").wait();
+
+      // Page would error here
+      const text = await page
+        .locator<HTMLDivElement>(".ready")
+        .evaluate((el) => el.textContent!);
+      expect(text).toEqual("value: production");
+    });
+  },
+});
+
+Deno.test({
+  name: "islands - in base path",
+  fn: async () => {
+    const selfCounter = getIsland("SelfCounter.tsx");
+
+    const app = testApp({ basePath: "/foo" })
+      .use(staticFiles())
+      .island(selfCounter, "SelfCounter", SelfCounter)
+      .get("/", (ctx) =>
+        ctx.render(
+          <Doc>
+            <SelfCounter />
+          </Doc>,
+        ));
+
+    await withBrowserApp(app, async (page, address) => {
+      await page.goto(`${address}/foo`, { waitUntil: "load" });
+      await page.locator(".ready").wait();
+
+      await page.locator(".increment").click();
+      await waitForText(page, ".output", "1");
+    });
+  },
+});
+
+Deno.test({
+  name: "islands - preserve f-* attributes",
+  fn: async () => {
+    const freshAttrs = getIsland("FreshAttrs.tsx");
+
+    const app = testApp()
+      .use(staticFiles())
+      .island(freshAttrs, "FreshAttrs", FreshAttrs)
+      .get("/", (ctx) =>
+        ctx.render(
+          <Doc>
+            <FreshAttrs />
+          </Doc>,
+        ));
+
+    await withBrowserApp(app, async (page, address) => {
+      await page.goto(address, { waitUntil: "load" });
+      await page.locator(".ready").wait();
+
+      const truthy = await page.locator<HTMLDivElement>(".f-client-nav-true")
+        .evaluate((el) => el.getAttribute("f-client-nav"));
+      const falsy = await page.locator<HTMLDivElement>(".f-client-nav-false")
+        .evaluate((el) => el.getAttribute("f-client-nav"));
+
+      expect(truthy).toEqual("true");
+      expect(falsy).toEqual("false");
+    });
+  },
 });
 
 Deno.test({
@@ -602,6 +659,30 @@ Deno.test({
       expect(text).toEqual("it works");
     });
   },
-  sanitizeResources: false,
-  sanitizeOps: false,
+});
+
+Deno.test({
+  name: "islands - adds preload HTTP headers",
+  fn: async () => {
+    const selfCounter = getIsland("SelfCounter.tsx");
+
+    const app = testApp()
+      .use(staticFiles())
+      .island(selfCounter, "SelfCounter", SelfCounter)
+      .get("/", (ctx) =>
+        ctx.render(
+          <Doc>
+            <SelfCounter />
+          </Doc>,
+        ));
+
+    const server = new FakeServer(await app.handler());
+    const res = await server.get("/");
+    await res.body?.cancel();
+
+    const link = res.headers.get("Link");
+    expect(link).toMatch(
+      /<\/fresh-runtime\.js\?__frsh_c=[^>]+>; rel="modulepreload"; as="script", <\/SelfCounter\.js\?__frsh_c=[^>]+>; rel="modulepreload"; as="script"/,
+    );
+  },
 });

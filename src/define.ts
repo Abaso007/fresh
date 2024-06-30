@@ -1,7 +1,7 @@
 import type { AnyComponent } from "preact";
 import type { HandlerByMethod, RouteHandler } from "./handlers.ts";
-import type { FreshContext } from "./context.ts";
 import type { Middleware } from "./middlewares/mod.ts";
+import type { PageProps } from "./context.ts";
 
 /**
  * A set of define functions that enable better type inference and code
@@ -34,7 +34,7 @@ export interface Define<State> {
    * returned from the handler is of the correct type:
    *
    * ```ts
-   * import { page } from "@fresh/core";
+   * import { page } from "fresh";
    * import { define } from "../utils.ts";
    *
    * export const handler = define.handlers<{ slug: string }>({
@@ -57,9 +57,7 @@ export interface Define<State> {
   handlers<
     Data,
     Handlers extends RouteHandler<Data, State> = RouteHandler<Data, State>,
-  >(
-    handlers: Handlers,
-  ): typeof handlers;
+  >(handlers: Handlers): typeof handlers;
 
   /**
    * Define a page component that will be rendered when a route handler returns
@@ -82,7 +80,7 @@ export interface Define<State> {
    * return type of the handler method.
    *
    * ```ts
-   * import { page } from "@fresh/core";
+   * import { page } from "fresh";
    * import { define } from "../utils.ts";
    *
    * export const handler = define.handlers({
@@ -110,9 +108,7 @@ export interface Define<State> {
     // deno-lint-ignore no-explicit-any
     Handler extends RouteHandler<any, State> = never,
     Data = Handler extends HandlerByMethod<infer Data, State> ? Data : never,
-  >(
-    render: AnyComponent<FreshContext<Data, State> & { Component: () => null }>,
-  ): typeof render;
+  >(render: AnyComponent<PageProps<Data, State>>): typeof render;
 
   /**
    * Define a {@link Middleware} that will be used to process requests before
@@ -135,9 +131,7 @@ export interface Define<State> {
    *
    * @typeParam M The type of the middleware function. This will be inferred from the input function. Do not manually specify this type.
    */
-  middleware<M extends Middleware<State>>(
-    middleware: M,
-  ): typeof middleware;
+  middleware<M extends Middleware<State>>(middleware: M): typeof middleware;
 }
 
 /**

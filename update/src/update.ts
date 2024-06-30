@@ -2,13 +2,15 @@ import * as path from "@std/path";
 import * as JSONC from "@std/jsonc";
 import * as tsmorph from "ts-morph";
 
-const SyntaxKind = tsmorph.ts.SyntaxKind;
+export const SyntaxKind = tsmorph.ts.SyntaxKind;
 
-export const FRESH_VERSION = "2.0.0-alpha.1";
-export const PREACT_VERSION = "10.20.2";
+export const FRESH_VERSION = "2.0.0-alpha.18";
+export const PREACT_VERSION = "10.22.0";
 export const PREACT_SIGNALS_VERSION = "1.2.3";
 
 export interface DenoJson {
+  name?: string;
+  version?: string;
   imports?: Record<string, string>;
 }
 
@@ -55,10 +57,24 @@ async function updateDenoJson(
   throw new Error(`Could not find deno.json or deno.jsonc in: ${dir}`);
 }
 
-interface ImportState {
+export interface ImportState {
   core: Set<string>;
   runtime: Set<string>;
+  compat: Set<string>;
 }
+
+const compat = new Set([
+  "defineApp",
+  "defineLayout",
+  "defineRoute",
+  "AppProps",
+  "ErrorPageProps",
+  "Handler",
+  "Handlers",
+  "LayoutProps",
+  "RouteContext",
+  "UnknownPageProps",
+]);
 
 export async function updateProject(dir: string) {
   // Update config
@@ -67,35 +83,36 @@ export async function updateProject(dir: string) {
       config.imports = {};
     }
 
-    config.imports["@fresh/core"] = `jsr:@fresh/core@^${FRESH_VERSION}`;
+    config.imports["fresh"] = `jsr:@fresh/core@^${FRESH_VERSION}`;
     config.imports["preact"] = `npm:preact@^${PREACT_VERSION}`;
     config.imports["@preact/signals"] =
       `npm:@preact/signals@^${PREACT_SIGNALS_VERSION}`;
     delete config.imports["$fresh/"];
+    delete config.imports["@preact/signals-core"];
+    delete config.imports["preact-render-to-string"];
   });
 
   // Update routes folder
-  const routesDir = path.join(dir, "routes");
-  if (await dirExists(routesDir)) {
-    const project = new tsmorph.Project();
-    const sfs = project.addSourceFilesAtPaths(
-      path.join(routesDir, "**", "*.{js,jsx,ts,tsx}"),
-    );
-    await Promise.all(sfs.map(async (sourceFile) => {
-      try {
-        return await updateFile(sourceFile);
-      } catch (err) {
-        console.error(`Could not process ${sourceFile.getFilePath()}`);
-        throw err;
-      }
-    }));
-  }
+  const project = new tsmorph.Project();
+  const sfs = project.addSourceFilesAtPaths(
+    path.join(dir, "**", "*.{js,jsx,ts,tsx}"),
+  );
+  await Promise.all(sfs.map(async (sourceFile) => {
+    try {
+      return await updateFile(sourceFile);
+    } catch (err) {
+      // deno-lint-ignore no-console
+      console.error(`Could not process ${sourceFile.getFilePath()}`);
+      throw err;
+    }
+  }));
 }
 
 async function updateFile(sourceFile: tsmorph.SourceFile): Promise<void> {
   const newImports: ImportState = {
     core: new Set(),
     runtime: new Set(),
+    compat: new Set(),
   };
 
   const text = sourceFile.getFullText()
@@ -108,92 +125,98 @@ async function updateFile(sourceFile: tsmorph.SourceFile): Promise<void> {
     .replaceAll('/// <reference lib="deno.ns" />\n', "");
   sourceFile.replaceWithText(text);
 
-  for (const [name, decl] of sourceFile.getExportedDeclarations()) {
-    if (name === "handler") {
-      const node = decl[0];
-      if (node.isKind(SyntaxKind.VariableDeclaration)) {
-        const init = node.getInitializer();
-        if (
-          init !== undefined && init.isKind(SyntaxKind.ObjectLiteralExpression)
-        ) {
-          for (const property of init.getProperties()) {
-            if (property.isKind(SyntaxKind.MethodDeclaration)) {
-              const name = property.getName();
-              if (
-                name === "GET" || name === "POST" || name === "PATCH" ||
-                name === "PUT" || name === "DELETE"
-              ) {
-                const body = property.getBody();
-                if (body !== undefined) {
-                  const stmts = body.getDescendantStatements();
-                  rewriteCtxMethods(stmts);
-                }
-
-                maybePrependReqVar(property, newImports, true);
-              }
-            } else if (property.isKind(SyntaxKind.PropertyAssignment)) {
-              const init = property.getInitializer();
-              if (
-                init !== undefined &&
-                (init.isKind(SyntaxKind.ArrowFunction) ||
-                  init.isKind(SyntaxKind.FunctionExpression))
-              ) {
-                const body = init.getBody();
-                if (body !== undefined) {
-                  const stmts = body.getDescendantStatements();
-                  rewriteCtxMethods(stmts);
-                }
-
-                maybePrependReqVar(init, newImports, true);
-              }
-            }
-          }
-        }
-      } else if (node.isKind(SyntaxKind.FunctionDeclaration)) {
-        const body = node.getBody();
-        if (body !== undefined) {
-          const stmts = body.getDescendantStatements();
-          rewriteCtxMethods(stmts);
-        }
-
-        maybePrependReqVar(node, newImports, false);
-      }
-    } else if (name === "default" && decl.length > 0) {
-      const caller = decl[0];
-      if (caller.isKind(SyntaxKind.CallExpression)) {
-        const expr = caller.getExpression();
-        if (expr.isKind(SyntaxKind.Identifier)) {
-          const text = expr.getText();
+  if (
+    sourceFile.getFilePath().includes("/routes/") &&
+    !sourceFile.getDirectoryPath().includes("/(_")
+  ) {
+    for (const [name, decl] of sourceFile.getExportedDeclarations()) {
+      if (name === "handler") {
+        const node = decl[0];
+        if (node.isKind(SyntaxKind.VariableDeclaration)) {
+          const init = node.getInitializer();
           if (
-            text === "defineApp" || text === "defineLayout" ||
-            text === "defineRoute"
+            init !== undefined &&
+            init.isKind(SyntaxKind.ObjectLiteralExpression)
           ) {
-            const args = caller.getArguments();
-            if (args.length > 0) {
-              const first = args[0];
-              if (
-                first.isKind(SyntaxKind.ArrowFunction) ||
-                first.isKind(SyntaxKind.FunctionExpression)
-              ) {
-                const body = first.getBody();
-                if (body !== undefined) {
-                  const stmts = body.getDescendantStatements();
-                  rewriteCtxMethods(stmts);
-                }
+            for (const property of init.getProperties()) {
+              if (property.isKind(SyntaxKind.MethodDeclaration)) {
+                const name = property.getName();
+                if (
+                  name === "GET" || name === "POST" || name === "PATCH" ||
+                  name === "PUT" || name === "DELETE"
+                ) {
+                  const body = property.getBody();
+                  if (body !== undefined) {
+                    const stmts = body.getDescendantStatements();
+                    rewriteCtxMethods(stmts);
+                  }
 
-                maybePrependReqVar(first, newImports, false);
+                  maybePrependReqVar(property, newImports, true);
+                }
+              } else if (property.isKind(SyntaxKind.PropertyAssignment)) {
+                const init = property.getInitializer();
+                if (
+                  init !== undefined &&
+                  (init.isKind(SyntaxKind.ArrowFunction) ||
+                    init.isKind(SyntaxKind.FunctionExpression))
+                ) {
+                  const body = init.getBody();
+                  if (body !== undefined) {
+                    const stmts = body.getDescendantStatements();
+                    rewriteCtxMethods(stmts);
+                  }
+
+                  maybePrependReqVar(init, newImports, true);
+                }
               }
             }
           }
-        }
-      } else if (caller.isKind(SyntaxKind.FunctionDeclaration)) {
-        const body = caller.getBody();
-        if (body !== undefined) {
-          const stmts = body.getDescendantStatements();
-          rewriteCtxMethods(stmts);
-        }
+        } else if (node.isKind(SyntaxKind.FunctionDeclaration)) {
+          const body = node.getBody();
+          if (body !== undefined) {
+            const stmts = body.getDescendantStatements();
+            rewriteCtxMethods(stmts);
+          }
 
-        maybePrependReqVar(caller, newImports, false);
+          maybePrependReqVar(node, newImports, false);
+        }
+      } else if (name === "default" && decl.length > 0) {
+        const caller = decl[0];
+        if (caller.isKind(SyntaxKind.CallExpression)) {
+          const expr = caller.getExpression();
+          if (expr.isKind(SyntaxKind.Identifier)) {
+            const text = expr.getText();
+            if (
+              text === "defineApp" || text === "defineLayout" ||
+              text === "defineRoute"
+            ) {
+              const args = caller.getArguments();
+              if (args.length > 0) {
+                const first = args[0];
+                if (
+                  first.isKind(SyntaxKind.ArrowFunction) ||
+                  first.isKind(SyntaxKind.FunctionExpression)
+                ) {
+                  const body = first.getBody();
+                  if (body !== undefined) {
+                    const stmts = body.getDescendantStatements();
+                    rewriteCtxMethods(stmts);
+                  }
+
+                  maybePrependReqVar(first, newImports, false);
+                }
+              }
+            }
+          }
+        } else if (caller.isKind(SyntaxKind.FunctionDeclaration)) {
+          const body = caller.getBody();
+          if (body !== undefined) {
+            const stmts = body.getDescendantStatements();
+            rewriteCtxMethods(stmts);
+          }
+
+          maybePrependReqVar(caller, newImports, false);
+        }
       }
     }
   }
@@ -211,12 +234,14 @@ async function updateFile(sourceFile: tsmorph.SourceFile): Promise<void> {
       removeEmptyImport(d);
     } else if (specifier === "$fresh/server.ts") {
       hasCoreImport = true;
-      d.setModuleSpecifier("@fresh/core");
+      d.setModuleSpecifier("fresh");
 
       for (const n of d.getNamedImports()) {
         const name = n.getName();
-        if (newImports.core.has(name)) {
-          newImports.core.delete(name);
+        newImports.core.delete(name);
+        if (compat.has(name)) {
+          n.remove();
+          newImports.compat.add(name);
         }
       }
       if (newImports.core.size > 0) {
@@ -224,15 +249,15 @@ async function updateFile(sourceFile: tsmorph.SourceFile): Promise<void> {
           d.addNamedImport(name);
         });
       }
+
+      removeEmptyImport(d);
     } else if (specifier === "$fresh/runtime.ts") {
       hasRuntimeImport = true;
-      d.setModuleSpecifier("@fresh/core/runtime");
+      d.setModuleSpecifier("fresh/runtime");
 
       for (const n of d.getNamedImports()) {
         const name = n.getName();
-        if (newImports.runtime.has(name)) {
-          newImports.runtime.delete(name);
-        }
+        newImports.runtime.delete(name);
       }
       if (newImports.runtime.size > 0) {
         newImports.runtime.forEach((name) => {
@@ -246,14 +271,20 @@ async function updateFile(sourceFile: tsmorph.SourceFile): Promise<void> {
 
   if (!hasCoreImport && newImports.core.size > 0) {
     sourceFile.addImportDeclaration({
-      moduleSpecifier: "@fresh/core",
+      moduleSpecifier: "fresh",
       namedImports: Array.from(newImports.core),
     });
   }
   if (!hasRuntimeImport && newImports.runtime.size > 0) {
     sourceFile.addImportDeclaration({
-      moduleSpecifier: "@fresh/core/runtime",
+      moduleSpecifier: "fresh/runtime",
       namedImports: Array.from(newImports.core),
+    });
+  }
+  if (newImports.compat.size > 0) {
+    sourceFile.addImportDeclaration({
+      moduleSpecifier: "fresh/compat",
+      namedImports: Array.from(newImports.compat),
     });
   }
 
@@ -318,6 +349,7 @@ function maybePrependReqVar(
     if (method.isKind(SyntaxKind.ArrowFunction)) {
       const body = method.getBody();
       if (!body.isKind(SyntaxKind.Block)) {
+        // deno-lint-ignore no-console
         console.warn(`Cannot transform arrow function`);
         return;
       }
@@ -434,13 +466,5 @@ function rewriteCtxMemberName(
     }
   } else if (children[0].isKind(SyntaxKind.PropertyAccessExpression)) {
     rewriteCtxMemberName(children[0]);
-  }
-}
-
-async function dirExists(dir: string): Promise<boolean> {
-  try {
-    return (await Deno.stat(dir)).isDirectory;
-  } catch (_) {
-    return false;
   }
 }
