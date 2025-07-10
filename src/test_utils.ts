@@ -125,7 +125,11 @@ export async function withTmpDir(
   return {
     dir,
     async [Symbol.asyncDispose]() {
-      await Deno.remove(dir, { recursive: true });
+      try {
+        await Deno.remove(dir, { recursive: true });
+      } catch {
+        // Ignore errors Files in tmp will be cleaned up by the OS
+      }
     },
   };
 }
